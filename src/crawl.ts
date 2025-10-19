@@ -1,4 +1,5 @@
 import { JSDOM } from 'jsdom';
+import { ExtractedPageData } from './types';
 
 export const normalizeURL = (input: string) => {
     const urlObj = new URL(input);
@@ -49,7 +50,7 @@ export const getURLsFromHTML = (html: string, baseURL: string): string[] => {
                     const urlObj = new URL(href, baseURL).toString();
                     urls.push(urlObj);
                 } catch {
-                    // skip invalid URLs
+                    console.log(`Invalid URL found: ${href}`);
                 }
             }
         });
@@ -78,7 +79,7 @@ export const getImagesFromHTML = (html: string, baseURL: string): string[] => {
                     const urlObj = new URL(src, baseURL).toString();
                     urls.push(urlObj);
                 } catch {
-                    
+                    console.log(`Invalid Image URL found: ${src}`);
                 }
             }
         });
@@ -90,5 +91,46 @@ export const getImagesFromHTML = (html: string, baseURL: string): string[] => {
     finally {
         return urls;
     }
+}
+
+
+export const extractPageData = (
+  html: string,
+  pageURL: string,
+): ExtractedPageData => {
+  return {
+    url: pageURL,
+    h1: getH1FromHTML(html),
+    first_paragraph: getFirstParagraphFromHTML(html),
+    outgoing_links: getURLsFromHTML(html, pageURL),
+    image_urls: getImagesFromHTML(html, pageURL),
+  };
+}
+
+export const getHTML = async (url: string) => {
+    console.log(`crawling ${url}`);
+    let res;
+
+    try {
+        res = await fetch(url, {
+            headers: {
+                "User-Agent": "VCrawler/1.0"
+            }
+        });
+    } catch(error) {
+        throw new Error(`Network error: ${error}`);
+    }
+    
+    if(res.status >= 399){
+        console.log(`HTTP error: ${res.status} ${res.statusText}`);
+        return;
+    }
+
+    const contentType = res.headers.get("content-type") || "";
+    if(!contentType || !contentType.includes("text/html")) {
+        console.log(`Get non-html response: ${contentType}`);
+        return;
+    }
+    console.log(await res.text());
 }
 
