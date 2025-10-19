@@ -8,15 +8,28 @@ const main = async() => {
    if(cliArgsLength < 3) {
         console.log("Please provide the URL to crawl");
    }
-   else if(cliArgsLength > 3) {
-        console.log("Too many arguments provided. Please provide only the URL to crawl");
+   else if(cliArgsLength > 5) {
+        console.log("Too many arguments provided. Please provide only the URL, Max Concurrecy and Max Pages to crawl");
    }
    else {
         const urlToCrawl = argv[2];
-        console.log(`Crawling URL: ${urlToCrawl}`);
-          const pages = await crawlSiteAsync(urlToCrawl,5);
+        const maxConcurrency = Number(argv[3]);
+        const maxPages = Number(argv[4]);
 
-        console.log(pages);
+        if (!Number.isFinite(maxConcurrency) || maxConcurrency <= 0) {
+            console.log("invalid maxConcurrency");
+            process.exit(1);
+        }
+        if (!Number.isFinite(maxPages) || maxPages <= 0) {
+            console.log("invalid maxPages");
+            process.exit(1);
+        }
+
+        console.log(
+            `starting crawl of: ${urlToCrawl} (concurrency=${maxConcurrency}, maxPages=${maxPages})...`,
+        );
+
+        await crawlSiteAsync(urlToCrawl, maxConcurrency, maxPages);
       
    }
    process.exit(0);
