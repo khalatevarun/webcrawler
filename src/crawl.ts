@@ -33,3 +33,62 @@ export const getFirstParagraphFromHTML = (html: string): string => {
   }
 }
 
+export const getURLsFromHTML = (html: string, baseURL: string): string[] => {
+
+    const urls:string[] = [];
+
+    try {
+        const dom = new JSDOM(html);
+        const doc = dom.window.document;
+
+        const aTags = doc.querySelectorAll("a");
+        aTags.forEach((aTag) => {
+            const href = aTag.getAttribute("href");
+            if(href) {
+                try {
+                    const urlObj = new URL(href, baseURL).toString();
+                    urls.push(urlObj);
+                } catch {
+                    // skip invalid URLs
+                }
+            }
+        });
+    }
+
+         catch {
+
+    }
+    finally {
+        return urls;
+    }
+}
+      
+export const getImagesFromHTML = (html: string, baseURL: string): string[] => {
+
+    const urls:string[] = [];
+    try {
+        const dom = new JSDOM(html);
+        const doc = dom.window.document;
+
+        const imageTags = doc.querySelectorAll("img");
+        imageTags.forEach((imgTag) => {
+            const src = imgTag.getAttribute("src");
+            if(src) {
+                try {
+                    const urlObj = new URL(src, baseURL).toString();
+                    urls.push(urlObj);
+                } catch {
+                    
+                }
+            }
+        });
+
+    }
+    catch {
+
+    }
+    finally {
+        return urls;
+    }
+}
+
