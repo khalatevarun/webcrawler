@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom';
 import { ExtractedPageData } from './types';
-
+import pLimit from "p-limit";
 
 /**
  * Normalize a URL for consistent comparison and storage.
@@ -201,4 +201,114 @@ export const crawlPage = async(baseURL: string, currentURL: string = baseURL, pa
     }
 
     return pages;
+}
+
+
+
+class ConcurrentCrawler {
+    private baseURL:string = "";
+    private pages: Record<string, number> = {};
+    private limit: <T>(fn: () => Promise<T>) => Promise<T>;
+
+    constructor(baseURL: string, maxConcurrency: number = 1) {
+        this.baseURL = baseURL;
+        this.pages = {};
+        this.limit = pLimit(maxConcurrency);
+  }
+
+    private addPageVisit(normalizedURL: string): boolean {
+        if(this.pages[normalizedURL] > 0){
+            this.pages[normalizedURL]++;
+            return false;
+        }
+        else {
+            this.pages[normalizedURL] = 1;
+            return true;
+        }
+    }
+
+    private getHTML = async (url: string): Promise<string> => {
+
+        return await this.limit(async () => {
+            let res;
+
+            try {
+                res = await fetch(url, {
+                    headers: {
+                        "User-Agent": "VCrawler/1.0"
+                    }
+                });
+            } catch(error) {
+                throw new Error(`Network error: ${error}`);
+            }
+            
+            if(res.status >= 399){
+                console.log(`HTTP error: ${res.status} ${res.statusText}`);
+                return "";
+            }
+
+            const contentType = res.headers.get("content-type") || "";
+            if(!contentType || !contentType.includes("text/html")) {
+                console.log(`Get non-html response: ${contentType}`);
+                return "";
+            }
+            return await res.text();
+         })
+}
+
+/**
+ * A recursive function to crawl pages of a given website
+ * @param baseURL - to store the parent url 
+ * @param currentURL - to keep track of current url and make sure the hostname matches with baseurl, we want to only parse baseURl's domain specific url and not all
+ * @param pages - to store the url: count found while crawling the whole website
+ */
+private async crawlPage(currentURL: string): Promise<void> {
+
+const baseURLObj = new URL(this.baseURL);
+const currentURLObj = new URL(currentURL);
+
+// if the currenturl is outside the website's domain, we want to skip it
+if(baseURLObj.hostname !== currentURLObj.hostname){
+    return
+}
+
+let currentNormalizedURL = normalizeURL(currentURL); // normalizing the url for consistent formatted entries in pages object
+
+if(!this.addPageVisit(currentNormalizedURL)){
+    return;
+}
+
+    console.log(`crawling ${currentURL}`);
+
+
+let html = "";
+
+try { 
+    html = await this.getHTML(currentURL);
+}
+catch(error){
+    console.log(`Error: ${(error as Error).message}`)
+}
+
+const nextURLs = getURLsFromHTML(html, this.baseURL);
+
+const crawlPromises = nextURLs.map((nextURL) => this.crawlPage(nextURL));
+
+await Promise.all(crawlPromises);
+
+}
+
+    async crawl(): Promise<Record<string, number>> {
+    await this.crawlPage(this.baseURL);
+    return this.pages;
+  }
+
+}
+
+export async function crawlSiteAsync(
+  baseURL: string,
+  maxConcurrency: number = 5,
+): Promise<Record<string, number>> {
+  const crawler = new ConcurrentCrawler(baseURL, maxConcurrency);
+  return await crawler.crawl();
 }
