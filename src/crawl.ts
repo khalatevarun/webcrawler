@@ -1,6 +1,21 @@
 import { JSDOM } from 'jsdom';
 import { ExtractedPageData } from './types';
 
+
+/**
+ * Normalize a URL for consistent comparison and storage.
+ * - Removes the protocol (http/https)
+ * - Returns host + pathname only
+ *
+ * Examples:
+ *  - https://www.varunhnk.com/blog  => "www.varunhnk.com/blog"
+ *  - https://www.varunhnk.com/blog/ => "www.varunhnk.com/blog"
+ *  - HTTP://WWW.Example.com/Path/   => "www.example.com/path"
+ *  - https://example.com/           => "example.com" 
+ * 
+ * @param input Full absolute URL to normalize
+ * @returns Normalized URL string in the form "host/path" (lowercased, no trailing slash)
+ */
 export const normalizeURL = (input: string) => {
     const urlObj = new URL(input);
     let fullPath = `${urlObj.host}${urlObj.pathname}`;
@@ -34,6 +49,17 @@ export const getFirstParagraphFromHTML = (html: string): string => {
   }
 }
 
+
+/**
+ * Extracts all valid absolute URLs from <a> tags in the given HTML string.
+ * - Resolves relative links using the provided baseURL
+ * - Skips invalid URLs 
+ * - Returns an array of absolute URLs as strings
+ *
+ * @param html HTML string to parse for <a> tags
+ * @param baseURL Base URL to resolve relative links
+ * @returns Array of absolute URLs as strings
+ */
 export const getURLsFromHTML = (html: string, baseURL: string): string[] => {
 
     const urls:string[] = [];
@@ -107,7 +133,7 @@ export const extractPageData = (
   };
 }
 
-export const getHTML = async (url: string) => {
+export const getHTML = async (url: string): Promise<string> => {
     console.log(`crawling ${url}`);
     let res;
 
@@ -123,14 +149,56 @@ export const getHTML = async (url: string) => {
     
     if(res.status >= 399){
         console.log(`HTTP error: ${res.status} ${res.statusText}`);
-        return;
+        return "";
     }
 
     const contentType = res.headers.get("content-type") || "";
     if(!contentType || !contentType.includes("text/html")) {
         console.log(`Get non-html response: ${contentType}`);
-        return;
+        return "";
     }
-    console.log(await res.text());
+    return await res.text();
 }
 
+/**
+ * A recursive function to crawl pages of a given website
+ * @param baseURL - to store the parent url 
+ * @param currentURL - to keep track of current url and make sure the hostname matches with baseurl, we want to only parse baseURl's domain specific url and not all
+ * @param pages - to store the url: count found while crawling the whole website
+ */
+export const crawlPage = async(baseURL: string, currentURL: string = baseURL, pages: Record<string, number> = {}) => {
+
+    const baseURLObj = new URL(baseURL);
+    const currentURLObj = new URL(currentURL);
+
+    // if the currenturl is outside the website's domain, we want to skip it
+    if(baseURLObj.hostname !== currentURLObj.hostname){
+        return pages;
+    }
+
+    let currentNormalizedURL = normalizeURL(currentURL); // normalizing the url for consistent formatted entries in pages object
+
+    if(pages[currentNormalizedURL] > 0){
+        pages[currentNormalizedURL]++;
+        return pages;
+    }
+    
+    pages[currentNormalizedURL] = 1;
+
+    let html = "";
+
+    try { 
+        html = await getHTML(currentURL);
+    }
+    catch(error){
+        console.log(`Error: ${(error as Error).message}`)
+    }
+
+    const allURLs = getURLsFromHTML(html, baseURL); // returns all "absolute" urls to new pages in the html
+
+    for(const nextURL of allURLs) {
+        pages = await crawlPage(baseURL, nextURL, pages);
+    }
+
+    return pages;
+}

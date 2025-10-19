@@ -1,6 +1,6 @@
 import { url } from 'node:inspector';
 import { argv } from 'node:process';
-import { getHTML } from './crawl';
+import { crawlPage, getHTML } from './crawl';
 
 const main = async() => {
 
@@ -15,10 +15,13 @@ const main = async() => {
    else {
         const urlToCrawl = argv[2];
         console.log(`Crawling URL: ${urlToCrawl}`);
-        await getHTML(urlToCrawl);
+        const pages = await crawlPage(urlToCrawl);
+        console.log(pages);
+      
    }
    process.exit(0);
 
+   
 }
 
 main();
