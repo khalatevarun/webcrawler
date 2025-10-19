@@ -206,56 +206,42 @@ export const crawlPage = async(baseURL: string, currentURL: string = baseURL, pa
 
 
 class ConcurrentCrawler {
-    private baseURL:string = "";
-    private pages: Record<string, number> = {};
+    private baseURL: string = "";
+    private pages: Record<string, ExtractedPageData> = {};
     private limit: <T>(fn: () => Promise<T>) => Promise<T>;
     private maxPages: number;
     private shouldStop = false;
     private allTasks = new Set<Promise<void>>();
     private abortController = new AbortController();
-
     private visited = new Set<string>();
-
-
 
     constructor(baseURL: string, maxConcurrency: number = 1, maxPages: number = 10) {
         this.baseURL = baseURL;
         this.pages = {};
         this.limit = pLimit(maxConcurrency);
         this.maxPages = Math.max(1, maxPages);
-  }
+    }
 
     private addPageVisit(normalizedURL: string): boolean {
-        if(this.shouldStop){
+        if (this.shouldStop) {
             return false;
         }
-        if(this.pages.size === this.maxPages) { 
+        if (Object.keys(this.pages).length === this.maxPages) {
             console.log("Reached maximum number of pages to crawl.");
-            this.abortController.abort() 
+            this.abortController.abort();
             return false;
         }
-
-        if(this.pages[normalizedURL] > 0){
-            this.pages[normalizedURL]++;
-        }
-        else {
-            this.pages[normalizedURL] = 1;
-        }
-
         if (this.visited.has(normalizedURL)) {
             return false;
         }
-
         if (this.visited.size >= this.maxPages) {
             this.shouldStop = true;
             console.log("Reached maximum number of pages to crawl.");
             this.abortController.abort();
             return false;
         }
-
         this.visited.add(normalizedURL);
         return true;
-
     }
 
     private getHTML = async (url: string): Promise<string> => {
@@ -298,74 +284,59 @@ class ConcurrentCrawler {
  * @param pages - to store the url: count found while crawling the whole website
  */
 private async crawlPage(currentURL: string): Promise<void> {
-
-    if(this.shouldStop){
+    if (this.shouldStop) {
         return;
     }
-
-const baseURLObj = new URL(this.baseURL);
-const currentURLObj = new URL(currentURL);
-
-// if the currenturl is outside the website's domain, we want to skip it
-if(baseURLObj.hostname !== currentURLObj.hostname){
-    return
-}
-
-let currentNormalizedURL = normalizeURL(currentURL); // normalizing the url for consistent formatted entries in pages object
-
-if(!this.addPageVisit(currentNormalizedURL)){
-    return;
-}
-
-    console.log(`crawling ${currentURL}`);
-
-
-let html = "";
-
-try { 
-    html = await this.getHTML(currentURL);
-}
-catch(error){
-    console.log(`Error: ${(error as Error).message}`)
-}
-    if (this.shouldStop) return;
-
-const nextURLs = getURLsFromHTML(html, this.baseURL);
-
-
-const crawlPromises: Promise<void>[] = [];
-for (const nextURL of nextURLs) {
-    if (this.shouldStop) break;
-
-    const task = this.crawlPage(nextURL);
-    this.allTasks.add(task);
-    task.finally(() => this.allTasks.delete(task));
-    crawlPromises.push(task);
-}
-
-await Promise.all(crawlPromises);
-
-}
-
-    async crawl(): Promise<Record<string, number>> {
-    const rootTask = this.crawlPage(this.baseURL);
-    this.allTasks.add(rootTask);
-    try {
-      await rootTask;
-    } finally {
-      this.allTasks.delete(rootTask);
+    const baseURLObj = new URL(this.baseURL);
+    const currentURLObj = new URL(currentURL);
+    if (baseURLObj.hostname !== currentURLObj.hostname) {
+        return;
     }
-    await Promise.allSettled(Array.from(this.allTasks));
-    return this.pages;
-  }
+    let currentNormalizedURL = normalizeURL(currentURL);
+    if (!this.addPageVisit(currentNormalizedURL)) {
+        return;
+    }
+    console.log(`crawling ${currentURL}`);
+    let html = "";
+    try {
+        html = await this.getHTML(currentURL);
+    } catch (error) {
+        console.log(`Error: ${(error as Error).message}`);
+    }
+    if (this.shouldStop) return;
+    // Store ExtractedPageData for this page
+    this.pages[currentNormalizedURL] = extractPageData(html, currentURL);
+    const nextURLs = getURLsFromHTML(html, this.baseURL);
+    const crawlPromises: Promise<void>[] = [];
+    for (const nextURL of nextURLs) {
+        if (this.shouldStop) break;
+        const task = this.crawlPage(nextURL);
+        this.allTasks.add(task);
+        task.finally(() => this.allTasks.delete(task));
+        crawlPromises.push(task);
+    }
+    await Promise.all(crawlPromises);
+}
+
+        async crawl(): Promise<Record<string, ExtractedPageData>> {
+                const rootTask = this.crawlPage(this.baseURL);
+                this.allTasks.add(rootTask);
+                try {
+                        await rootTask;
+                } finally {
+                        this.allTasks.delete(rootTask);
+                }
+                await Promise.allSettled(Array.from(this.allTasks));
+                return this.pages;
+        }
 
 }
 
 export async function crawlSiteAsync(
-  baseURL: string,
-  maxConcurrency: number = 5,
-  maxPages:number = 10
-): Promise<Record<string, number>> {
-  const crawler = new ConcurrentCrawler(baseURL, maxConcurrency, maxPages);
-  return await crawler.crawl();
+    baseURL: string,
+    maxConcurrency: number = 5,
+    maxPages: number = 10
+): Promise<Record<string, ExtractedPageData>> {
+    const crawler = new ConcurrentCrawler(baseURL, maxConcurrency, maxPages);
+    return await crawler.crawl();
 }

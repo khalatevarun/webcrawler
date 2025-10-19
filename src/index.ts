@@ -1,5 +1,6 @@
 import { argv } from 'node:process';
 import { crawlSiteAsync } from './crawl';
+import { writeCSVReport } from './report';
 
 const main = async() => {
 
@@ -29,8 +30,8 @@ const main = async() => {
             `starting crawl of: ${urlToCrawl} (concurrency=${maxConcurrency}, maxPages=${maxPages})...`,
         );
 
-        await crawlSiteAsync(urlToCrawl, maxConcurrency, maxPages);
-      
+    const pageData = await crawlSiteAsync(urlToCrawl, maxConcurrency, maxPages);
+    writeCSVReport(pageData);
    }
    process.exit(0);
 
