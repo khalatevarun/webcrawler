@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { extractPageData, getFirstParagraphFromHTML, getH1FromHTML, getImagesFromHTML, getURLsFromHTML, normalizeURL } from './crawl';
+import { extractPageData, getFirstParagraphFromHTML, getH1FromHTML, getImagesFromHTML, getURLsFromHTML, normalizeURL } from './utils/crawl';
 
 test('normalizeURL protocol',() => {
     const input = "https://www.varunhnk.com/blog";

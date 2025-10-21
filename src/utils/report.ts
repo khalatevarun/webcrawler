@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { ExtractedPageData } from "./types";
+import { ExtractedPageData } from "../types";
 
 function csvEscape(field: string) {
   const str = field ?? "";
