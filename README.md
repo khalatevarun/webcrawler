@@ -19,7 +19,7 @@ Controls concurrency by limiting the number of promises that can run simultaneou
 ### `AbortController`
 Provides a mechanism to cancel in-flight HTTP requests when the crawler reaches its maximum page limit.
 
-### URL Normalization
+### `Normalization`
 Converts URLs to a consistent format (e.g., `www.example.com/path`) for accurate duplicate detection across different URL representations.
 
 ## Examples
